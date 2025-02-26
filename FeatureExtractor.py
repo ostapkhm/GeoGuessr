@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 import torchvision.transforms as transforms
+from PIL import Image
 
 
 class FeatureExtractor(ABC):
@@ -86,37 +87,49 @@ class RootSIFT(FeatureExtractor):
 
 class VGGNet(FeatureExtractor):
     def __init__(self):
-        super().__init__()
-
-        self.input_shape = (400, 1920)
+        self.input_shape = (224, 224)
         self.pooling = 'max'
         
-        # Load pre-trained VGG16 model without fully connected layers
+        # Load pre-trained VGG-16 and keep feature extractor + max pooling
         self.model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
-        self.model = nn.Sequential(*list(self.model.features.children()))  # Remove FC layers
-        
+        self.model = nn.Sequential(
+            *list(self.model.features.children()),
+            nn.AdaptiveMaxPool2d((1, 1))
+        )
+
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self.model.to(self.device).eval()
 
-        # Define transformation
+        # Transformation (apply individually per image part)
         self.transform = transforms.Compose([
+            transforms.Resize(self.input_shape),
             transforms.ToTensor(),
-            transforms.Resize((self.input_shape[0], self.input_shape[1])),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+								 std=[0.229, 0.224, 0.225])
         ])
 
-
     def _extract_features(self, image):
-        # Convert image to tensor and move to GPU
-        image = self.transform(image).unsqueeze(0).to(self.device)
+        width = image.shape[1] // 3
 
-        # Extract features with torch.no_grad() to save memory
-        with torch.no_grad():
-            features = self.model(image)
+        # Split image into 3 equal parts
+        image_parts = [
+            image[:, :width],         # Left
+            image[:, width:2*width],  # Center
+            image[:, 2*width:3*width] # Right
+        ]
+
         
-        # Convert features to numpy and normalize
-        features = features.cpu().numpy().flatten()
-        norm_features = features / np.linalg.norm(features)
+        images = torch.stack([self.transform(Image.fromarray(part)) for part in image_parts]).to(self.device)
 
-        return norm_features
+        with torch.no_grad():
+            features = self.model(images) 
+
+        features = features.view(features.shape[0], -1).cpu().numpy()
+
+        # Normalize feature vectors
+        norm_features = features / np.linalg.norm(features, axis=1, keepdims=True)
+        final_features = np.concatenate(norm_features, axis=0)
+
+        return final_features
 
