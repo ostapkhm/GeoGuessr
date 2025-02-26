@@ -6,8 +6,11 @@ import os
 from tqdm import tqdm
 import contextlib
 
-from tensorflow.keras.applications.vgg16 import VGG16
-from tensorflow.keras.applications.vgg16 import preprocess_input
+
+import torch
+import torch.nn as nn
+import torchvision.models as models
+import torchvision.transforms as transforms
 
 
 class FeatureExtractor(ABC):
@@ -82,29 +85,38 @@ class RootSIFT(FeatureExtractor):
 
 
 class VGGNet(FeatureExtractor):
-	def __init__(self):
-		super().__init__()
+    def __init__(self):
+        super().__init__()
 
-		self.input_shape = (224, 224, 3)
-		self.weight = 'imagenet'
-		self.pooling = 'max'
-		self.model = VGG16(weights = self.weight, 
-							input_shape = (self.input_shape[0], 
-							self.input_shape[1], self.input_shape[2]), 
-							pooling = self.pooling, 
-							include_top = False)
-						
+        self.input_shape = (400, 1920)
+        self.pooling = 'max'
+        
+        # Load pre-trained VGG16 model without fully connected layers
+        self.model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
+        self.model = nn.Sequential(*list(self.model.features.children()))  # Remove FC layers
+        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self.model.to(self.device).eval()
 
-	def _extract_features(self, image):
-		# Resize image
-		image = cv.resize(image, (self.input_shape[0], self.input_shape[1]))
-		image = np.expand_dims(image, axis=0)
-		image = preprocess_input(image)
+        # Define transformation
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((self.input_shape[0], self.input_shape[1])),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
-		# Suppress output during inference
-		with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f):
-			features = self.model.predict(image)
 
-		norm_features = features[0] / np.linalg.norm(features[0])
-		return norm_features
+    def _extract_features(self, image):
+        # Convert image to tensor and move to GPU
+        image = self.transform(image).unsqueeze(0).to(self.device)
+
+        # Extract features with torch.no_grad() to save memory
+        with torch.no_grad():
+            features = self.model(image)
+        
+        # Convert features to numpy and normalize
+        features = features.cpu().numpy().flatten()
+        norm_features = features / np.linalg.norm(features)
+
+        return norm_features
 

@@ -1,0 +1,14 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: linux-64
+# created-by: conda 25.1.1
+
+python=3.11.6=hab00c5b_0_cpython
+chromadb=0.4.13=py311h38be061_0
+matplotlib-base=3.10.0=py311hbfdbfaf_0
+pillow=11.0.0=pypi_0
+scikit-learn=1.6.1=py311h6a678d5_0
+scipy=1.15.1=py311h08b1b3b_0
+seaborn=0.13.2=py311h06a4308_1
+torch=2.6.0+cu126=pypi_0
+tqdm=4.67.1=pyhd8ed1ab_1
