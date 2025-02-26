@@ -1,7 +1,5 @@
 from DataScraper import DataScraper
-from FeatureExtractor import FeatureExtractor
-from FeatureExtractor import RootSIFT
-from VLAD import VLAD
+from ImageRetrieval import VLAD, NNet
 from DistrictParser import DistrictParser
 
 import cv2 as cv
@@ -20,7 +18,7 @@ def compose_panorama(root, ext):
 
 
 def compare_images(query_img_path, db_image_path):
-    # Compare two images given teir path
+    # Compare two images given their paths
 
     query_img = cv.cvtColor(cv.imread(query_img_path), cv.COLOR_BGR2RGB)
     db_img_root, db_img_ext = os.path.splitext(db_image_path)
@@ -42,71 +40,73 @@ def compare_images(query_img_path, db_image_path):
     plt.show()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="VLAD Image Retrieval using RootSIFT")
-    parser.add_argument("--data_dir", type=str, required=True, help="Directory path to store images/db")
-    parser.add_argument("--query_image_path", type=str, required=True, help="Path to the query image (the image to compare with others in the database)")
-    parser.add_argument("--n_features", type=int, default=500, help="Max number of features to extract from query image")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+def get_boolean_input(prompt):
+    """Helper function to get a yes/no input from the user."""
+    while True:
+        response = input(prompt).strip().lower()
+        if response in ["yes", "y", "1"]:
+            return True
+        elif response in ["no", "n", "0"]:
+            return False
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
 
+def get_positive_int_input(prompt, default):
+    """Helper function to get a positive integer input from the user."""
+    while True:
+        value = input(f"{prompt} (default: {default}): ").strip()
+        if not value:  # Use default if input is empty
+            return default
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+        else:
+            print("Invalid input. Please enter a positive integer.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Image Retrieval CLI")
+    parser.add_argument("--data_dir", type=str, required=True, help="Directory path to resources")
+    parser.add_argument("--query_image_path", type=str, required=True, help="Path to the query image (the image to compare with others in the database)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    
     args = parser.parse_args()
 
-    db_path = os.path.join(args.data_dir, 'db')
-    vlad = VLAD(db_path, verbose=args.verbose)
+    output_dir = os.path.join(args.data_dir, "Images")
 
-    if vlad.database_exists():
-        vlad.load()
+    
+    create = get_boolean_input("Would you like to create a new database? (yes/no): ")
 
+    # Ask user to choose retrieval method
+    while True:
+        method = input("Choose retrieval method (NN/VLAD): ").strip().lower()
+        if method in ["nn", "vlad"]:
+            break
+        print("Invalid input. Please enter 'NN' or 'VLAD'.")
+
+    # Initialize and create the database
+    if method == "nn":
+        db_path = os.path.join(args.data_dir, 'db_nn')
+        retriever = NNet(db_path, create, verbose=args.verbose)
     else:
-        print("Creating new DB")
-        print("Specify number of clusters")
-        k = 512
-        print(k)
+        db_path = os.path.join(args.data_dir, 'db_vlad')
+        k = get_positive_int_input("Specify k", default=512)
+        features_nb = get_positive_int_input("Specify number of features", default=3000)
+        retriever = VLAD(db_path, create, k, features_nb, verbose=args.verbose)
 
-        print("Specify number of features")
-        features_nb = 3000
-        print(features_nb)
+    if create:
+        retriever.fit(output_dir)
+    else:
+        print("Loading already existing DB")
 
-        vlad.create(k)
-
-        load_dotenv()
-
-        api_key = os.getenv("GOOGLE_API_KEY")
-        secret = os.getenv("GOOGLE_SECRET_KEY")
-
-        if not api_key or not secret:
-            raise ValueError("API key or Secret key is missing. Set them in a .env file.")
-    
-        if args.verbose:
-            print("API Key and Secret loaded successfully.")
-    
-        centeres, r_mins, lengths, n_points = DistrictParser.get_districts()
-        output_dir = os.path.join(args.data_dir, "Images")
-
-        # data_scraper = DataScraper(api_key, secret)
-        # data_scraper.retrieve_panoramas(r_mins, lengths, n_points, size, centeres, output_dir)
-
-        ft_extractor = FeatureExtractor(features_nb)
-        descriptors, paths, subdir_nb = ft_extractor.extract_features(output_dir)
-    
-        if args.verbose:
-            print("Total images:", np.sum(subdir_nb))
-
-        if args.verbose:
-            print("Total descriptors:", len(np.vstack(descriptors)))
-        
-        vlad.fit(descriptors, paths)
-
+    # Query image retrieval
     if args.verbose:
-        print("Querying an image...")
+        print(f"Querying an image using {method.upper()}...")
 
-    query_image = cv.imread(args.query_image_path, cv.IMREAD_GRAYSCALE)
-    _, query_descriptors = RootSIFT(args.n_features).detect_and_compute(query_image)
-    best_match_path = vlad.predict(query_descriptors)
-    
+    best_match_path = retriever.predict(args.query_image_path)
+
     if args.verbose:
         print("Retrieved image path:", best_match_path)
-    
+
     compare_images(args.query_image_path, best_match_path)
 
 
