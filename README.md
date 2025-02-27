@@ -57,7 +57,7 @@ For example:
 ![Example1](https://github.com/user-attachments/assets/58eff5fb-642c-444d-99aa-3e5b635a8227)  
 
 After specifying multiple districts, the collected data is visualized in:  
-[output_map.html](assets/output_map.html).  
+<a href="assets/output_map.html" target="_blank">output_map.html</a>. 
 
 While the entire city of Kyiv was not scraped (due to cost constraints), the dataset presents significant challenges for location matching. There are a lot of locations with similar foliage or buildings (Troieshchyna is a good example).
 
