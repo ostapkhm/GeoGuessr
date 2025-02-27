@@ -1,0 +1,17 @@
+name: geoguessr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.6
+  - chromadb=0.4.13
+  - matplotlib-base=3.10.0
+  - pillow=11.0.0
+  - scikit-learn=1.6.1
+  - scipy=1.15.1
+  - python-dotenv=1.0.1
+  - seaborn=0.13.2
+  - tqdm=4.67.1
+  - pip
+  - pip:
+      - torch==2.6.0+cu126
