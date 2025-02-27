@@ -65,12 +65,7 @@ While the entire city of Kyiv was not scraped (due to cost constraints), the dat
 
 ## **Image Retrieval Using VLAD and RootSIFT**  
 
-As a first approach, features are extracted using the SIFT detector, specifically its RootSIFT variant, which enhances codebook clustering by leveraging the Hellinger distance metric.  
-
-For example:  
-![Example2](https://github.com/user-attachments/assets/29c4b8fa-ddd2-4b7b-8c2e-8986e033a62c)  
-
-The extracted features are then aggregated using VLAD (Vector of Locally Aggregated Descriptors) with a specified codebook size and stored in ChromaDB for efficient retrieval.  
+As a first approach, features are extracted using the SIFT detector, specifically its RootSIFT variant, which enhances codebook clustering by leveraging the Hellinger distance metric. The extracted features are then aggregated using VLAD (Vector of Locally Aggregated Descriptors) with a specified codebook size and stored in ChromaDB for efficient retrieval.  
 
 ---
 
