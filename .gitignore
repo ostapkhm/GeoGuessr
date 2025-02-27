@@ -1,12 +1,10 @@
 Images/
-.chroma
-Examples/
 QueryImages/
-db_*/
-
+dbs/
 test_images/
 train_images/
 
+.chroma
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
