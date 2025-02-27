@@ -6,7 +6,7 @@ from tqdm import tqdm
 import chromadb
 import os
 
-from FeatureExtractor import RootSIFT, VGGNet
+from FeatureExtractor import RootSIFT, ViT
 
 
 class ImageRetrieval(ABC):
@@ -197,7 +197,7 @@ class NNet(ImageRetrieval):
     def __init__(self, db_path, create, verbose=True):
         super().__init__(db_path, create, verbose)
 
-        self.feature_extractor_ = VGGNet()
+        self.feature_extractor_ = ViT()
 
     
     def fit(self, image_dir):

@@ -4,14 +4,14 @@ import numpy as np
 import cv2 as cv
 import os
 from tqdm import tqdm
-import contextlib
+from PIL import Image
 
 
 import torch
 import torch.nn as nn
-import torchvision.models as models
 import torchvision.transforms as transforms
-from PIL import Image
+from torchvision.models import vit_b_16, ViT_B_16_Weights
+
 
 
 class FeatureExtractor(ABC):
@@ -58,8 +58,9 @@ class FeatureExtractor(ABC):
 
 
 	@abstractmethod
-	def _extract_features(self, img_path):
+	def _extract_features(self, image):
 		pass
+
 
 
 class RootSIFT(FeatureExtractor):
@@ -85,51 +86,66 @@ class RootSIFT(FeatureExtractor):
 		return descs
 
 
-class VGGNet(FeatureExtractor):
-    def __init__(self):
-        self.input_shape = (224, 224)
-        self.pooling = 'max'
-        
-        # Load pre-trained VGG-16 and keep feature extractor + max pooling
-        self.model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
-        self.model = nn.Sequential(
-            *list(self.model.features.children()),
-            nn.AdaptiveMaxPool2d((1, 1))
-        )
+class ViT(FeatureExtractor):
+	def __init__(self):
+		super().__init__()
+		self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+		# Initialize ViT model
+		self.model = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_V1)
+
+		# Create a modified forward method to get embeddings instead of classification
+		self.original_forward = self.model.forward
+		self.model.forward = self._forward_features
+
+		self.model.eval()
+		self.model.to(self.device)
+
+		# ViT specific transforms
+		self.transform = transforms.Compose([
+			transforms.Resize(224),
+			transforms.CenterCrop(224),
+			transforms.ToTensor(),
+			transforms.Normalize(mean=[0.485, 0.456, 0.406],
+									std=[0.229, 0.224, 0.225])
+		])
+
+	def _forward_features(self, x):
+		# Process input
+		x = self.model._process_input(x)
+		n = x.shape[0]
+
+		# Add class token
+		cls_token = self.model.class_token.expand(n, -1, -1)
+		x = torch.cat([cls_token, x], dim=1)
+		x = self.model.encoder(x)
+
+		# Return CLS token embedding
+		return x[:, 0]
 
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = self.model.to(self.device).eval()
+	@torch.no_grad()
+	def _extract_features(self, image):
+		width = image.shape[1] // 3
 
-        # Transformation (apply individually per image part)
-        self.transform = transforms.Compose([
-            transforms.Resize(self.input_shape),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-								 std=[0.229, 0.224, 0.225])
-        ])
+		# Split image into 3 equal parts
+		image_parts = [
+			image[:, :width],  # Left
+			image[:, width:2 * width],  # Center
+			image[:, 2 * width:3 * width]  # Right
+		]
 
-    def _extract_features(self, image):
-        width = image.shape[1] // 3
+		images = torch.stack([self.transform(Image.fromarray(part)) for part in image_parts]).to(self.device)
+		features = self.model(images)
+		features = features.view(features.shape[0], -1).cpu().numpy()
 
-        # Split image into 3 equal parts
-        image_parts = [
-            image[:, :width],         # Left
-            image[:, width:2*width],  # Center
-            image[:, 2*width:3*width] # Right
-        ]
+		norm_features = features / np.linalg.norm(features, axis=1, keepdims=True)
+		final_features = np.concatenate(norm_features, axis=0)
 
-        
-        images = torch.stack([self.transform(Image.fromarray(part)) for part in image_parts]).to(self.device)
+		return final_features
 
-        with torch.no_grad():
-            features = self.model(images) 
 
-        features = features.view(features.shape[0], -1).cpu().numpy()
-
-        # Normalize feature vectors
-        norm_features = features / np.linalg.norm(features, axis=1, keepdims=True)
-        final_features = np.concatenate(norm_features, axis=0)
-
-        return final_features
-
+	def __del__(self):
+		# Restore original forward method when object is destroyed
+		if hasattr(self, 'original_forward'):
+			self.model.forward = self.original_forward

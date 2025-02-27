@@ -54,3 +54,29 @@ class DistrictParser:
             n_points.append(points_nb)
 
         return centeres, r_mins, lengths, n_points
+
+
+def get_boolean_input(prompt):
+    """Helper function to get a yes/no input from the user."""
+    while True:
+        response = input(prompt).strip().lower()
+        if response in ["yes", "y", "1"]:
+            return True
+        elif response in ["no", "n", "0"]:
+            return False
+        else:
+            print("Invalid input. Please enter 'yes' or 'no'.")
+
+
+def get_positive_int_input(prompt, default):
+    """Helper function to get a positive integer input from the user."""
+    while True:
+        value = input(f"{prompt} (default: {default}): ").strip()
+        if not value: 
+            return default
+        if value.isdigit() and int(value) > 0:
+            return int(value)
+        else:
+            print("Invalid input. Please enter a positive integer.")
+
+

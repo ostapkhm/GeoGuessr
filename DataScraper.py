@@ -178,7 +178,7 @@ class DataScraper:
         return np.round(valid_coords, 6)
 
     
-    def retrieve_image(self, coordinate, heading, size, pitch=0.0):
+    def retrieve_image(self, coordinate, heading, size=(640, 400), pitch=0.0):
         # Retrieve a Google Street View image based on the provided parameters.
         # Raises:
         #     PanoUnavailableError: If panorama is not available at the given coordinates.
@@ -221,7 +221,7 @@ class DataScraper:
         raise ImageRetrievalError("Too many retry attempts.")
 
 
-    def retrieve_panorama(self, coordinates, size, output_dir, center, length, pitch=0):
+    def retrieve_panorama(self, coordinates, output_dir, center, length, size=(640, 400), pitch=0):
         # Retrieve a set of 360-degree panoramas at the given coordinates and save the images to a specified directory.
         # The function saves images in a structured subdirectory based on the center coordinate and region length.
         
@@ -245,7 +245,7 @@ class DataScraper:
                     print(f"Skipping image at {coordinate} due to error: {e}")
 
     
-    def retrieve_panoramas(self, r_mins, lengths, n_points, size, centeres, output_dir):
+    def retrieve_panoramas(self, r_mins, lengths, n_points, centeres, output_dir, size=(640, 400)):
         # Retrieve panoramas at multiple centers and save the images and map to the specified output directory.
         os.makedirs(output_dir, exist_ok=True)
 
